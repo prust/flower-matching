@@ -15,8 +15,8 @@ Mouse:
 
 Keyboard:
 * The arrow keys move the current tile
-* The first click selects the current tile (indicated by the border turning white)
-* The second click swaps tiles the current tile with the selected tile
+* Press the spacebar to select the current tile (indicated by the border turning white)
+* Press the spacebar again to swap the current tile with the selected tile
 
 Passing:
 * For either player to "pass", press the "P" key on the keyboard when it is their turn.
