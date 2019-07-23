@@ -111,10 +111,16 @@ int main(int num_args, char* args[]) {
   if (SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND) < 0)
     error("setting blend mode");
 
+  char* base_path = SDL_GetBasePath();
+  char* filename = "spritesheet.png";
+  char file_path[strlen(base_path) + strlen(filename) + 1];
+  strcpy(file_path, base_path);
+  strcat(file_path, filename);
+
   int x, y, n;
-  byte *data = stbi_load("spritesheet.png", &x, &y, &n, 4);
+  byte *data = stbi_load(file_path, &x, &y, &n, 4);
   if (data == NULL) {
-    printf("Error loading spritesheet.png: %s", stbi_failure_reason());
+    printf("Error loading spritesheet.png: %s\n", stbi_failure_reason());
     SDL_Quit();
     exit(-1);
   }
