@@ -23,7 +23,7 @@ Keyboard:
 
 ## Download
 
-You can download the game [for Windows here](https://github.com/prust/flower-matching/releases/download/v0.1/flower-matching-win.zip), or [for OS X here](https://github.com/prust/flower-matching/releases/download/v0.1/flower-matching-osx.zip).
+You can download the game [for Windows here](https://github.com/prust/flower-matching/releases/download/v0.1.1/flower-matching-win.zip), or [for OS X here](https://github.com/prust/flower-matching/releases/download/v0.1.1/flower-matching-osx.zip).
 
 ## Attributions
 
