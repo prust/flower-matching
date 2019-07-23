@@ -1,0 +1,41 @@
+* bonus points for 5 or 6 in a row
+* bonus points for 1-move? Maybe 2pts for 1 move, 1pt for normal
+* controller support
+* 6-in-a-row blows away everything of that color/shape & doesn't replace with that color/shape, effectively reducing the pattern/color count (but they will eventually come back)
+  * but only if it's in 1 or 2 moves
+* instead of swapping two, shift the whole row and move the end one
+* animate the row-shifting so it's not so hard to grok
+* like dr mario, two sides work simultaneously on the same puzzle
+* something that shows a streak of 2-move matches?
+
+* * *
+
+* get rid of confusing # of moves, just record how many moves it takes & award points accordingly
+* move simultaneously, no turns
+
+* * *
+
+Add a timer for both players
+
+Give a time-and-move bonus for 5-in-a-row, double for 6-in-a-row.
+
+It's odd to have one player finish so much faster than another...
+   can we "meter out" the moves or something?
+   or give an infinite number of moves, but track them & subtract them from the points?
+
+The game should end at the same time for all players, I think...
+  maybe the # of moves is rationed out based on the amount of time left?
+
+* * *
+
+Order of players:
+
+Loop through each Controller (if any)
+
+then mouse
+then keyboard
+
+* * *
+
+Wait until a mouse move / arrow-key move / controller-move to throw a has_moved & display the selection box
+Wait until a player has made a selection to throw a has_selected boolean & display the score

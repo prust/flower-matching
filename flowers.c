@@ -6,8 +6,10 @@
 #include <limits.h>
 
 #include "SDL.h"
-#include "SDL_image.h"
 #include "font8x8_basic.h"
+
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
 
 #define NONE -1
 
@@ -24,6 +26,7 @@ typedef struct {
   int curr_tile_pos;
   int sel_tile_pos;
   int coins;
+  int num_moves;
 } Player;
 
 int to_x(int ix);
@@ -38,9 +41,10 @@ bool is_in_grid(int x, int y);
 int render_text(SDL_Renderer* renderer, char str[], int offset_x, int offset_y, int size);
 void render_sprite(SDL_Renderer* renderer, SDL_Texture* spritesheet, byte sprite_id, int dest_x, int dest_y);
 
-void on_select_curr_tile(Player* player, int* curr_player_turn, byte sprites[]);
+void on_select_curr_tile(Player* player, byte sprites[]);
 bool check_for_point(byte sprites[], int pos, Player* player);
 void replace_flowers(byte sprites[], int target_sprite_id, int start_pos, int end_pos);
+void add_points(Player* player, int num_matches);
 
 void error(char* activity);
 
@@ -49,27 +53,25 @@ int num_blocks_h = 8;
 int grid_len;
 
 int target_matches = 4;
-int max_moves = 1;
-int moves_left = 1;
-int num_passes = 0;
+int target_moves = 2;
 
 int block_w = 100;
 int block_h = 100;
 int grid_spacing = 6;
 Viewport vp = {.x = 0, .y = 0};
 
-int curr_player_turn = 1;
-
 Player player1 = {
   .curr_tile_pos = 0,
   .sel_tile_pos = NONE,
-  .coins = 0
+  .coins = 0,
+  .num_moves = 25
 };
 
 Player player2 = {
   .curr_tile_pos = 0,
   .sel_tile_pos = NONE,
-  .coins = 0
+  .coins = 0,
+  .num_moves = 25
 };
 
 int hud_height = 100;
@@ -92,7 +94,7 @@ int main(int num_args, char* args[]) {
     error("initializing SDL");
 
   SDL_Window* window;
-  window = SDL_CreateWindow("Jessica's Flower Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, num_blocks_w * block_w, num_blocks_h * block_h, SDL_WINDOW_RESIZABLE);
+  window = SDL_CreateWindow("P+J 15th Anniversary Game", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, num_blocks_w * block_w, num_blocks_h * block_h, SDL_WINDOW_RESIZABLE);
   if (!window)
     error("creating window");
   
@@ -109,9 +111,26 @@ int main(int num_args, char* args[]) {
   if (SDL_SetRenderDrawBlendMode(renderer, SDL_BLENDMODE_BLEND) < 0)
     error("setting blend mode");
 
-  SDL_Texture* spritesheet = IMG_LoadTexture(renderer, "spritesheet.png");
+  int x, y, n;
+  byte *data = stbi_load("spritesheet.png", &x, &y, &n, 4);
+  if (data == NULL) {
+    printf("Error loading spritesheet.png: %s", stbi_failure_reason());
+    SDL_Quit();
+    exit(-1);
+  }
+
+  int pitch = x * 4; // pitch = # bytes per line of image data
+  int depth = 32;    // depth = # bits per pixel?
+  SDL_Surface* surface = SDL_CreateRGBSurfaceWithFormatFrom(data, x, y, depth, pitch, SDL_PIXELFORMAT_RGBA32);
+  if (!surface)
+    error("creating surface with format from data");
+
+  SDL_Texture *spritesheet = SDL_CreateTextureFromSurface(renderer, surface);
   if (!spritesheet)
-    error("loading spritesheet");
+    error("creating texture from surface");
+
+  SDL_FreeSurface(surface);
+  stbi_image_free(data);
 
   SDL_Event evt;
   bool exit_game = false;
@@ -127,8 +146,7 @@ int main(int num_args, char* args[]) {
         exit_game = true;
       }
       else if (evt.type == SDL_MOUSEBUTTONDOWN) {
-        if (curr_player_turn == 1)
-          on_select_curr_tile(&player1, &curr_player_turn, sprites);
+        on_select_curr_tile(&player1, sprites);
 
         // if (grid_flags[pos] & EXPLORED) {
         //   if (terrain_id == RCK)
@@ -165,21 +183,8 @@ int main(int num_args, char* args[]) {
           player2.curr_tile_pos = above(player2.curr_tile_pos);
         else if (evt.key.keysym.sym == SDLK_DOWN)
           player2.curr_tile_pos = below(player2.curr_tile_pos);
-        else if (evt.key.keysym.sym == SDLK_SPACE && curr_player_turn == 2)
-          on_select_curr_tile(&player2, &curr_player_turn, sprites);
-        else if (evt.key.keysym.sym == SDLK_p) {
-          num_passes++;
-          
-          // every time both players pass in a row, bump up the max number of moves
-          if (num_passes % 2 == 0)
-            max_moves++;
-
-          moves_left = max_moves;
-          if (curr_player_turn == 1)
-            curr_player_turn = 2;
-          else
-            curr_player_turn = 1;
-        }
+        else if (evt.key.keysym.sym == SDLK_SPACE)
+          on_select_curr_tile(&player2, sprites);
       }
     }
 
@@ -216,7 +221,7 @@ int main(int num_args, char* args[]) {
         render_sprite(renderer, spritesheet, sprites[pos], x, y);
 
         // draw selection box
-        if ((curr_player_turn == 1 && (pos == player1.curr_tile_pos || pos == player1.sel_tile_pos)) || (curr_player_turn == 2 && (pos == player2.curr_tile_pos  || pos == player2.sel_tile_pos))) {
+        if (pos == player1.curr_tile_pos || pos == player1.sel_tile_pos || pos == player2.curr_tile_pos || pos == player2.sel_tile_pos) {
           if (pos == player1.sel_tile_pos || pos == player2.sel_tile_pos) {
             if (SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255) < 0)
               error("setting selection color");
@@ -249,7 +254,7 @@ int main(int num_args, char* args[]) {
     }
 
     char resources_str[80];
-    snprintf(resources_str, sizeof(resources_str), "Player 1: %d, Player 2: %d    Player %d: %d Moves Left", player1.coins, player2.coins, curr_player_turn, moves_left);
+    snprintf(resources_str, sizeof(resources_str), "Player 1: %d pts/%d moves, Player 2: %d pts/%d moves", player1.coins, player1.num_moves, player2.coins, player2.num_moves);
     if (SDL_SetRenderDrawColor(renderer, 255, 255, 255, 255) < 0)
       error("setting text color");
 
@@ -268,7 +273,7 @@ int main(int num_args, char* args[]) {
 
 // game logic functions
 
-void on_select_curr_tile(Player* player, int* curr_player_turn, byte sprites[]) {
+void on_select_curr_tile(Player* player, byte sprites[]) {
   if (player->sel_tile_pos == NONE) {
     player->sel_tile_pos = player->curr_tile_pos;
   }
@@ -283,8 +288,8 @@ void on_select_curr_tile(Player* player, int* curr_player_turn, byte sprites[]) 
       int sel_x = to_x(player->sel_tile_pos);
       int sel_y = to_y(player->sel_tile_pos);
 
-      if (abs(curr_x - sel_x) <= 1 && abs(curr_y - sel_y) <= 1) {
-        moves_left--;
+      if (abs(curr_x - sel_x) <= 1 && abs(curr_y - sel_y) <= 1 && player->num_moves) {
+        player->num_moves--;
 
         // Swap curr & selected tiles
         int curr_sprite_id = sprites[player->curr_tile_pos];
@@ -294,29 +299,7 @@ void on_select_curr_tile(Player* player, int* curr_player_turn, byte sprites[]) 
         bool sel_points = check_for_point(sprites, player->sel_tile_pos, player);
         bool curr_points = check_for_point(sprites, player->curr_tile_pos, player);
 
-        // if the player ran out of moves & didn't make a point
-        // swap the tiles back
-        if (!sel_points && !curr_points && !moves_left) {
-          sprites[player->sel_tile_pos] = sprites[player->curr_tile_pos];
-          sprites[player->curr_tile_pos] = curr_sprite_id;
-        }
-
-        player->sel_tile_pos = NONE;
-
-        // switch to the other player's turn
-        if (!moves_left || sel_points || curr_points) {
-          if (*curr_player_turn == 1)
-            *curr_player_turn = 2;
-          else
-            *curr_player_turn = 1;
-
-          // if there are left-over moves, reduce the number
-          if (moves_left)
-            max_moves = max_moves - moves_left;
-          moves_left = max_moves;
-
-          num_passes = 0;
-        }     
+        player->sel_tile_pos = NONE; 
       }
     }
   }
@@ -345,7 +328,7 @@ bool check_for_point(byte sprites[], int pos, Player* player) {
     }
     else {
       if (num_matches >= target_matches) {
-        player->coins++;
+        add_points(player, num_matches);
         got_points = true;
         replace_flowers(sprites, target_sprite_id, to_pos(x - 1, pos_y), to_pos(start_x, pos_y));
       }
@@ -354,7 +337,7 @@ bool check_for_point(byte sprites[], int pos, Player* player) {
   }
 
   if (num_matches >= target_matches) {
-    player->coins++;
+    add_points(player, num_matches);
     got_points = true;
     replace_flowers(sprites, target_sprite_id, to_pos(end_x, pos_y), to_pos(start_x, pos_y));
   }
@@ -374,7 +357,7 @@ bool check_for_point(byte sprites[], int pos, Player* player) {
     }
     else {
       if (num_matches >= target_matches) {
-        player->coins++;
+        add_points(player, num_matches);
         got_points = true;
         replace_flowers(sprites, target_sprite_id, to_pos(pos_x, y - 1), to_pos(pos_x, start_y));
       }
@@ -383,12 +366,22 @@ bool check_for_point(byte sprites[], int pos, Player* player) {
   }
 
   if (num_matches >= target_matches) {
-    player->coins++;
+    add_points(player, num_matches);
     got_points = true;
     replace_flowers(sprites, target_sprite_id, to_pos(pos_x, end_y), to_pos(pos_x, start_y));
   }
 
   return got_points;
+}
+
+void add_points(Player* player, int num_matches) {
+  int num_points = 1;
+
+  // bonus point for every match that's over the target number of matches
+  num_points += num_matches - target_matches;
+
+  if (num_points > 0)
+    player->coins += num_points;
 }
 
 void replace_flowers(byte sprites[], int target_sprite_id, int start_pos, int end_pos) {
