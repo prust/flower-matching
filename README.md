@@ -14,7 +14,7 @@ When a match is made, the player gets 1 point for if it is 4-in-a-row, 2 points 
 
 Mouse:
 * The first click selects the current tile (indicated by the border turning white)
-* The second click swaps tiles the current tile with the selected tile
+* The second click swaps the current tile with the selected tile
 
 Keyboard:
 * The arrow keys move the current tile
